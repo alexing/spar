@@ -24,7 +24,10 @@ def create_spotify_client():
         scope='playlist-modify-public playlist-modify-private playlist-read-private',
         cache_path=None,
     )
-    sp = spotipy.Spotify(auth_manager=auth_manager)
+    token_info = auth_manager.refresh_access_token(os.getenv("SPOTIFY_REFRESH_TOKEN"))
+    access_token = token_info["access_token"]
+
+    sp = spotipy.Spotify(auth=access_token)
     return sp, auth_manager
 
 

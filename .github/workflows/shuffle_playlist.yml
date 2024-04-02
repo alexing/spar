@@ -2,7 +2,8 @@ name: Shuffle Spotify Playlist
 
 on:
   schedule:
-    - cron: '* * * * *'
+    - cron: '0 0 * * 0'  # Runs at 00:00 every Sunday
+  workflow_dispatch:
 
 jobs:
   shuffle-playlist:

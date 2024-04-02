@@ -14,34 +14,34 @@ playlist_id = os.getenv('SPOTIFY_PLAYLIST_ID')
 chunk_size = 100
 
 
+
 def create_spotify_client():
-    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
+    # Initialize Spotify client with SpotifyOAuth for authentication
+    auth_manager = SpotifyOAuth(
         client_id=os.getenv('SPOTIFY_CLIENT_ID'),
         client_secret=os.getenv('SPOTIFY_CLIENT_SECRET'),
         redirect_uri=os.getenv('SPOTIFY_REDIRECT_URI'),
         scope='playlist-modify-public playlist-modify-private playlist-read-private',
-        cache_path=None  # Disable cache_path in CI environment
-    ))
+        cache_path=None,
+    )
+    sp = spotipy.Spotify(auth_manager=auth_manager)
+    return sp, auth_manager
 
-    return sp
 
-
-def refresh_spotify_token(sp):
-    token_info = sp.auth_manager.get_cached_token()
-
-    if sp.auth_manager.is_token_expired(token_info):
+def refresh_spotify_token(auth_manager):
+    # Check if the current token is expired and refresh it
+    token_info = auth_manager.get_access_token(as_dict=False)
+    if not auth_manager.validate_token(token_info):
         print("Refreshing token")
-        token_info = sp.auth_manager.refresh_access_token(token_info['refresh_token'])
-        sp.auth_manager.token_info = token_info
+        token_info = auth_manager.refresh_access_token(os.getenv('SPOTIFY_REFRESH_TOKEN'))
     else:
         print("Token valid")
-
-    return sp
+    return token_info
 
 
 def main():
-    sp = create_spotify_client()
-    sp = refresh_spotify_token(sp)
+    sp, auth_manager = create_spotify_client()
+    refresh_spotify_token(auth_manager)
 
     playlist_name = sp.playlist(playlist_id).get("name")
     user_id = sp.me()['id']

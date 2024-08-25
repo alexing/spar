@@ -9,7 +9,12 @@ def fisher_yates_shuffle(arr: List[Any]) -> List[Any]:
     return arr
 
 
+def invert_array(arr: List[Any]) -> List[Any]:
+    return arr[::-1]
+
+
 def shuffle_n_times(arr: List[int], n: int) -> List[int]:
     for _ in range(n):
+        arr = invert_array(arr)  # for more chaos
         arr = fisher_yates_shuffle(arr)
     return arr

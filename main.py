@@ -11,8 +11,8 @@ client_id = os.getenv('SPOTIFY_CLIENT_ID')
 client_secret = os.getenv('SPOTIFY_CLIENT_SECRET')
 redirect_uri = os.getenv('SPOTIFY_REDIRECT_URI')
 playlist_id = os.getenv('SPOTIFY_PLAYLIST_ID')
-chunk_size = 100
-
+CHUNK_SIZE = 100
+AMOUNT_OF_SHUFFLES = 5
 
 
 def create_spotify_client():
@@ -62,15 +62,15 @@ def main():
     backup_playlist = sp.user_playlist_create(user_id, backup_playlist_name, public=False,
                                               description='Backup playlist')
     backup_playlist_id = backup_playlist.get("id")
-    for i in range(0, len(track_ids), chunk_size):
-        sp.playlist_add_items(backup_playlist_id, track_ids[i:i + chunk_size])
+    for i in range(0, len(track_ids), CHUNK_SIZE):
+        sp.playlist_add_items(backup_playlist_id, track_ids[i:i + CHUNK_SIZE])
     backup_playlist_url = f"https://open.spotify.com/playlist/{backup_playlist_id}"
     print(f"Created backup: {backup_playlist_name} @ {backup_playlist_url}")
 
-    shuffled_ids = shuffle_n_times(track_ids.copy(), 5)
+    shuffled_ids = shuffle_n_times(track_ids.copy(), AMOUNT_OF_SHUFFLES)
     sp.playlist_replace_items(playlist_id, [])
-    for i in range(0, len(shuffled_ids), chunk_size):
-        sp.playlist_add_items(playlist_id, shuffled_ids[i:i + chunk_size])
+    for i in range(0, len(shuffled_ids), CHUNK_SIZE):
+        sp.playlist_add_items(playlist_id, shuffled_ids[i:i + CHUNK_SIZE])
     print(f"shuffle done ✨")
 
     send_email(subject='Dale shuffled successfully!', body=f"""

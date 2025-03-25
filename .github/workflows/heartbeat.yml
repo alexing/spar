@@ -1,0 +1,13 @@
+name: Heartbeat  # let's avoid github marking our repo as inactive
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Runs daily at midnight; adjust as needed
+  workflow_dispatch:
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dummy step to maintain activity
+        run: echo "Heartbeat - workflow is active!"

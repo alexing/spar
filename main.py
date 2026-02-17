@@ -1,22 +1,23 @@
-from datetime import datetime
+import os
+from pathlib import Path
 
+from dotenv import load_dotenv
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-import os
 
 from emails import send_email
-from shuffle import shuffle_n_times
 
-client_id = os.getenv('SPOTIFY_CLIENT_ID')
-client_secret = os.getenv('SPOTIFY_CLIENT_SECRET')
-redirect_uri = os.getenv('SPOTIFY_REDIRECT_URI')
-playlist_id = os.getenv('SPOTIFY_PLAYLIST_ID')
+load_dotenv(Path(__file__).resolve().parent / ".env")
+from shuffle import sample_n
+
 CHUNK_SIZE = 100
-AMOUNT_OF_SHUFFLES = 5
+
+pool_playlist_id = os.getenv('SPOTIFY_POOL_PLAYLIST_ID')
+destination_playlist_id = os.getenv('SPOTIFY_PLAYLIST_ID')
+playlist_size = int(os.getenv('PLAYLIST_SIZE', '75'))
 
 
 def create_spotify_client():
-    # Initialize Spotify client with SpotifyOAuth for authentication
     auth_manager = SpotifyOAuth(
         client_id=os.getenv('SPOTIFY_CLIENT_ID'),
         client_secret=os.getenv('SPOTIFY_CLIENT_SECRET'),
@@ -32,51 +33,65 @@ def create_spotify_client():
 
 
 def refresh_spotify_token(auth_manager):
-    # Check if the current token is expired and refresh it
     token_info = auth_manager.get_access_token(as_dict=False)
     if not auth_manager.validate_token(token_info):
         print("Refreshing token")
-        token_info = auth_manager.refresh_access_token(os.getenv('SPOTIFY_REFRESH_TOKEN'))
+        auth_manager.refresh_access_token(os.getenv('SPOTIFY_REFRESH_TOKEN'))
     else:
         print("Token valid")
-    return token_info
+
+
+def fetch_all_track_ids(sp, playlist_id):
+    results = sp.playlist_items(playlist_id)
+    tracks = results['items']
+    while results['next']:
+        results = sp.next(results)
+        tracks.extend(results['items'])
+    return [track['track']['id'] for track in tracks if track['track']]
 
 
 def main():
     sp, auth_manager = create_spotify_client()
     refresh_spotify_token(auth_manager)
 
-    playlist_name = sp.playlist(playlist_id).get("name")
-    user_id = sp.me()['id']
-    playlist_url = f"https://open.spotify.com/playlist/{playlist_id}"
+    pool_playlist = sp.playlist(pool_playlist_id)
+    pool_name = pool_playlist['name']
+    pool_url = f"https://open.spotify.com/playlist/{pool_playlist_id}"
 
-    results = sp.playlist_items(playlist_id)
-    tracks = results['items']
-    while results['next']:
-        results = sp.next(results)
-        tracks.extend(results['items'])
-    track_ids = [track['track']['id'] for track in tracks]
-    print(f"Got all tracks from {playlist_name}: {len(track_ids)} tracks.")
+    dest_playlist = sp.playlist(destination_playlist_id)
+    dest_name = dest_playlist['name']
+    dest_url = f"https://open.spotify.com/playlist/{destination_playlist_id}"
 
-    backup_playlist_name = f"dale-bkp-{datetime.now().isoformat()}"
-    backup_playlist = sp.user_playlist_create(user_id, backup_playlist_name, public=False,
-                                              description='Backup playlist')
-    backup_playlist_id = backup_playlist.get("id")
-    for i in range(0, len(track_ids), CHUNK_SIZE):
-        sp.playlist_add_items(backup_playlist_id, track_ids[i:i + CHUNK_SIZE])
-    backup_playlist_url = f"https://open.spotify.com/playlist/{backup_playlist_id}"
-    print(f"Created backup: {backup_playlist_name} @ {backup_playlist_url}")
+    track_ids = fetch_all_track_ids(sp, pool_playlist_id)
+    print(f"Pool '{pool_name}': {len(track_ids)} tracks.")
 
-    shuffled_ids = shuffle_n_times(track_ids.copy(), AMOUNT_OF_SHUFFLES)
-    sp.playlist_replace_items(playlist_id, [])
-    for i in range(0, len(shuffled_ids), CHUNK_SIZE):
-        sp.playlist_add_items(playlist_id, shuffled_ids[i:i + CHUNK_SIZE])
-    print(f"shuffle done ✨")
+    if not track_ids:
+        send_email(
+            subject='SPAR: Pool is empty',
+            body=f"Pool playlist is empty. Nothing to sync.\n{pool_url}"
+        )
+        print("Pool empty, exiting.")
+        return
 
-    send_email(subject='Dale shuffled successfully!', body=f"""
-    Succesfully shuffled {playlist_name}: {playlist_url}
-    backup now is {backup_playlist_name}: {backup_playlist_url}
-    """)
+    sampled_ids = sample_n(track_ids, playlist_size)
+    n_used = len(sampled_ids)
+    if n_used < playlist_size:
+        print(f"Pool has fewer than {playlist_size} songs, using all {n_used}.")
+
+    sp.playlist_replace_items(destination_playlist_id, [])
+    for i in range(0, len(sampled_ids), CHUNK_SIZE):
+        sp.playlist_add_items(destination_playlist_id, sampled_ids[i:i + CHUNK_SIZE])
+    print(f"Synced {n_used} songs to '{dest_name}' ✨")
+
+    send_email(
+        subject='SPAR: Playlist refreshed',
+        body=f"""
+Refreshed {dest_name} with {n_used} random songs from your pool.
+
+Destination: {dest_url}
+Pool: {pool_url}
+"""
+    )
     print("bye!👋🏻")
 
 

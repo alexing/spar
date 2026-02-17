@@ -1,12 +1,12 @@
-name: Shuffle Spotify Playlist
+name: Refresh Spotify Playlist
 
 on:
   schedule:
-    - cron: '0 0 * * 0'  # Runs at 00:00 every Sunday
+    - cron: '0 0 * * 1'  # Runs at 00:00 every Monday
   workflow_dispatch:
 
 jobs:
-  shuffle-playlist:
+  refresh-playlist:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,13 +22,23 @@ jobs:
       run: |
         pip install -r requirements.txt
 
-    - name: Run the shuffle script
+    - name: Run the refresh script
       env:
         SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
         SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
         SPOTIFY_REDIRECT_URI: ${{ secrets.SPOTIFY_REDIRECT_URI }}
+        SPOTIFY_POOL_PLAYLIST_ID: ${{ secrets.SPOTIFY_POOL_PLAYLIST_ID }}
         SPOTIFY_PLAYLIST_ID: ${{ secrets.SPOTIFY_PLAYLIST_ID }}
         SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
+        PLAYLIST_SIZE: ${{ secrets.PLAYLIST_SIZE }}
         EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
-        # Add other environment variables here
       run: python main.py
+
+    - name: Keep workflow alive
+      run: |
+        git config user.name "github-actions"
+        git config user.email "github-actions@github.com"
+        date > .last-run
+        git add .last-run
+        git diff --cached --quiet || git commit -m "Keep workflow alive"
+        git push

@@ -8,9 +8,14 @@ from spotipy.oauth2 import SpotifyOAuth
 from emails import send_email
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
-from shuffle import sample_n
+from shuffle import sample_n, apply_ordered_groups
 
 CHUNK_SIZE = 100
+
+# Custom rules: if any track of a group gets picked, the whole group is added, back to back, in this order.
+ORDERED_GROUPS = [
+    ['7CeF4VXPoaUbNB3NNHIXfM', '6kQe8MBvSdX8AD1UsjRv7w'],  # Overture -> Strange Déjà Vu
+]
 
 pool_playlist_id = os.getenv('SPOTIFY_POOL_PLAYLIST_ID')
 destination_playlist_id = os.getenv('SPOTIFY_PLAYLIST_ID')
@@ -74,7 +79,7 @@ def main():
         print("Pool empty, exiting.")
         return
 
-    sampled_ids = sample_n(track_ids, playlist_size)
+    sampled_ids = apply_ordered_groups(sample_n(track_ids, playlist_size), ORDERED_GROUPS)
     n_used = len(sampled_ids)
     if n_used < playlist_size:
         print(f"Pool has fewer than {playlist_size} songs, using all {n_used}.")

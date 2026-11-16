@@ -42,12 +42,13 @@ def refresh_spotify_token(auth_manager):
 
 
 def fetch_all_track_ids(sp, playlist_id):
-    results = sp.playlist_items(playlist_id)
-    tracks = results['items']
+    # Uses new /items endpoint (Spotify deprecated /tracks in Feb 2026)
+    results = sp._get(f"playlists/{playlist_id}/items")
+    items = results['items']
     while results['next']:
         results = sp.next(results)
-        tracks.extend(results['items'])
-    return [track['track']['id'] for track in tracks if track['track']]
+        items.extend(results['items'])
+    return [item['item']['id'] for item in items if item.get('item')]
 
 
 def main():
@@ -78,9 +79,11 @@ def main():
     if n_used < playlist_size:
         print(f"Pool has fewer than {playlist_size} songs, using all {n_used}.")
 
-    sp.playlist_replace_items(destination_playlist_id, [])
+    # Uses new /items endpoints (Spotify deprecated /tracks in Feb 2026)
+    sp._put(f"playlists/{destination_playlist_id}/items", payload={"uris": []})
     for i in range(0, len(sampled_ids), CHUNK_SIZE):
-        sp.playlist_add_items(destination_playlist_id, sampled_ids[i:i + CHUNK_SIZE])
+        uris = [f"spotify:track:{tid}" for tid in sampled_ids[i:i + CHUNK_SIZE]]
+        sp._post(f"playlists/{destination_playlist_id}/items", payload={"uris": uris})
     print(f"Synced {n_used} songs to '{dest_name}' ✨")
 
     send_email(
